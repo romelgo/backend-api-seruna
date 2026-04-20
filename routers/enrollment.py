@@ -12,7 +12,6 @@ Pipeline:
 """
 import io
 import os
-import sys
 from pathlib import Path
 from typing import List
 
@@ -22,9 +21,7 @@ import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
-# Root del proyecto (backend/../)
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+import config
 
 from dataset_manager import DatasetManager
 
@@ -67,8 +64,7 @@ async def enroll_student(
     if not images:
         raise HTTPException(status_code=422, detail="Se requiere al menos 1 imagen.")
 
-    dataset_dir = PROJECT_ROOT / "dataset"
-    dm = DatasetManager(dataset_dir)
+    dm = DatasetManager(config.DATASET_DIR)
 
     # Crear estructura del estudiante
     dm.create_student(code, name)

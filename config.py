@@ -2,12 +2,15 @@
 Configuración global del sistema de enrollment facial.
 Optimizado para CUDA 12.9 + PyTorch 2.8+
 """
+import os
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 
 # ============================================================
-# Rutas
+# Rutas base
 # ============================================================
 # PyInstaller pone los archivos en _internal/, pero el .exe está un nivel arriba.
 # En desarrollo, __file__ apunta al directorio del proyecto directamente.
@@ -19,7 +22,13 @@ else:
     # Ejecutando como script Python normal
     BASE_DIR = Path(__file__).parent
 
-DATASET_DIR = BASE_DIR / "dataset"
+# Cargar variables desde .env ubicado junto a este archivo (backend/.env)
+load_dotenv(BASE_DIR / ".env")
+
+# DATASET_DIR: se lee del .env; si es ruta relativa se resuelve desde BASE_DIR
+_dataset_env = os.getenv("DATASET_DIR", "dataset")
+DATASET_DIR = (BASE_DIR / _dataset_env).resolve()
+
 MODELS_DIR = BASE_DIR / "models"
 
 # ============================================================
