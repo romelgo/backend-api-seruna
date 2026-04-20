@@ -17,11 +17,7 @@ AI_SERVER_SECRET = os.getenv("AI_SERVER_SECRET", "")
 
 router = APIRouter()
 
-async def _bg_mark_attendance(db, student_code: str, course_id: str):
-    try:
-        await db.mark_attendance(student_code, course_id)
-    except Exception as e:
-        print(f"[identify] Error marcando asistencia SQLite: {e}")
+
 
 async def _bg_notify_nextjs(
     student_code: str,
@@ -52,77 +48,8 @@ import time
 import uuid
 import datetime
 
-async def _bg_send_whatsapp_fastapi(student_code: str, name: str, frame_bytes: bytes):
-    try:
-        from supabase import create_client, Client as SC
-        import httpx
-        
-        supa_url = os.getenv("SUPABASE_URL")
-        supa_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        if not supa_url or not supa_key: return
-        
-        supa_client: SC = create_client(supa_url, supa_key)
-        
-        # 1. Obtener student ID
-        stu_res = supa_client.table("students").select("id").eq("student_code", student_code).execute()
-        if not stu_res.data: 
-            print(f"[ident_bg] Aborting: No student profile found for code {student_code}")
-            return
-        student_id = stu_res.data[0]["id"]
-        
-        # 2. Subir imagen a storage
-        filename = f"attendance/{student_id}/{int(time.time()*1000)}_py.jpg"
-        print(f"[ident_bg] Subiendo foto a supabase storage {filename}...")
-        supa_client.storage.from_("attendance-photos").upload(
-            file=frame_bytes,
-            path=filename,
-            file_options={"content-type": "image/jpeg", "upsert": "false"}
-        )
-        photo_url = supa_client.storage.from_("attendance-photos").get_public_url(filename)
-        print(f"[ident_bg] Photo uploaded: {photo_url}")
-        
-        # 3. Buscar tutores
-        parent_res = supa_client.table("parent_student").select("parent_id").eq("student_id", student_id).execute()
-        if not parent_res.data: 
-            print("[ident_bg] No parents linked. Aborting WhatsApp.")
-            return
-        parent_ids = [p["parent_id"] for p in parent_res.data]
-        print(f"[ident_bg] Parent IDs for student: {parent_ids}")
-        
-        parents_res = supa_client.table("parents").select("whatsapp_number, first_name").in_("id", parent_ids).execute()
-        if not parents_res.data: 
-            print("[ident_bg] No whatsapp numbers found for parents. Aborting.")
-            return
-        
-        time_str = datetime.datetime.now().strftime("%I:%M %p")
-        body_msg = f"Hola 👋\n\n*{name}* acaba de registrar su asistencia al instante.\n🕐 Hora: *{time_str}*\n\n_Validación vía IA completada exitosamente desde el Backend._"
-        
-        for p in parents_res.data:
-            if not p.get("whatsapp_number"): continue
-            to_num = p["whatsapp_number"]
-            # Limpiar número si traía formato de twilio u otro
-            if to_num.startswith("whatsapp:"):
-                to_num = to_num.replace("whatsapp:", "")
-            if to_num.startswith("+"):
-                to_num = to_num.replace("+", "")
-                
-            try:
-                # Llamada al servicio local de Baileys
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    resp = await client.post(
-                        "http://localhost:3001/send",
-                        json={
-                            "number": to_num,
-                            "message": body_msg,
-                            "media_url": photo_url
-                        }
-                    )
-                    print(f"[identify] Baileys service response para {to_num}: {resp.status_code}")
-            except Exception as e:
-                print(f"[identify] Error enviando a servicio Baileys para {to_num}: {e}")
-                
-    except Exception as e:
-         print(f"[identify] Error general en WhatsApp FASTAPI loop: {e}")
+# Cache to prevent rapid bursts of attendance marking for the same student
+_recent_attendances = {}
 
 @router.post("/identify")
 async def identify_frame(
@@ -134,7 +61,6 @@ async def identify_frame(
     recognizer = request.app.state.recognizer
     emb_manager = request.app.state.embedding_manager
     embeddings_index = request.app.state.embeddings_index
-    db = request.app.state.db
     threshold = request.app.state.similarity_threshold
 
     raw = await frame.read()
@@ -171,9 +97,35 @@ async def identify_frame(
         }
 
         if best_code is not None:
-            already_marked = await db.is_already_marked(best_code, course_id, date.today())
-            student = await db.get_student(best_code)
-            student_name = student["name"] if student else emb_manager.get_nombre(best_code) or best_code
+            student_name = emb_manager.get_nombre(best_code) or best_code
+            already_marked = False
+            
+            # Consultar en cache local primero para evitar rafagas y envíos duplicados de WhatsApp
+            now_time = time.time()
+            if best_code in _recent_attendances and (now_time - _recent_attendances[best_code]) < 60:
+                already_marked = True
+            
+            # Consultar con Supabase asincrónicamente
+            supa_url = os.getenv("SUPABASE_URL")
+            supa_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+            if supa_url and supa_key:
+                headers = {"apikey": supa_key, "Authorization": f"Bearer {supa_key}"}
+                try:
+                    async with httpx.AsyncClient(timeout=3.0) as client:
+                        # 1. Obtener datos del estudiante
+                        res_stu = await client.get(f"{supa_url}/rest/v1/students?student_code=eq.{best_code}&select=id,first_name,last_name", headers=headers)
+                        if res_stu.status_code == 200 and res_stu.json():
+                            stu = res_stu.json()[0]
+                            student_id = stu["id"]
+                            student_name = f"{stu['first_name']} {stu['last_name']}"
+                            
+                            # 2. Verificar asistencia de hoy
+                            today_start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+                            res_att = await client.get(f"{supa_url}/rest/v1/attendance?student_id=eq.{student_id}&timestamp=gte.{today_start}&select=id", headers=headers)
+                            if res_att.status_code == 200 and res_att.json():
+                                already_marked = True
+                except Exception as e:
+                    print(f"[identify] Error Supabase check: {e}")
             
             face_result.update({
                 "match": True,
@@ -183,9 +135,6 @@ async def identify_frame(
             })
 
             if not already_marked:
-                # Marcamos para que no se vuelva a marcar en la misma petición si hay un bug o doble cara
-                # aunque esto requeriría actualizar el DB, que es lo que hacemos en bg
-                background_tasks.add_task(_bg_mark_attendance, db, best_code, course_id)
 
                 frame_bytes_to_send: bytes | None = None
                 try:
@@ -214,14 +163,8 @@ async def identify_frame(
                     frame_bytes_to_send,
                 )
                 
-                # Enviar WhatsApp directamente desde FastAPI si hay imagen
-                if frame_bytes_to_send:
-                    background_tasks.add_task(
-                        _bg_send_whatsapp_fastapi,
-                        best_code,
-                        student_name,
-                        frame_bytes_to_send
-                    )
+                # Registrar en el cache local para bloquear futuros frames inmediatos
+                _recent_attendances[best_code] = time.time()
                 
         results.append(face_result)
 

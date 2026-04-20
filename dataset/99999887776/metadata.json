@@ -1,0 +1,17 @@
+{
+  "codigo": "99999887776",
+  "nombre": "jhojan  calsin castro",
+  "created_at": "2026-04-17T14:40:14.573056",
+  "updated_at": "2026-04-17T14:40:14.922137",
+  "total_raw": 0,
+  "total_faces": 5,
+  "total_augmented": 0,
+  "enrollment_complete": true,
+  "quality_scores": [
+    408.07,
+    207.06,
+    401.89,
+    641.35,
+    933.51
+  ]
+}

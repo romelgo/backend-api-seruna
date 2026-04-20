@@ -1,0 +1,17 @@
+{
+  "codigo": "9876554444",
+  "nombre": "walter monroy",
+  "created_at": "2026-04-17T14:49:07.826347",
+  "updated_at": "2026-04-17T14:49:08.111348",
+  "total_raw": 0,
+  "total_faces": 5,
+  "total_augmented": 0,
+  "enrollment_complete": true,
+  "quality_scores": [
+    910.96,
+    1104.48,
+    190.33,
+    796.97,
+    422.16
+  ]
+}
