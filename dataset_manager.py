@@ -275,6 +275,25 @@ class DatasetManager:
             "dataset_path": str(self.dataset_dir),
         }
 
+    def update_student_metadata(self, codigo: str, fields: Dict) -> bool:
+        """
+        Actualiza campos puntuales en metadata.json sin sobreescribir el resto.
+
+        Args:
+            codigo: Código del estudiante.
+            fields: Diccionario de campos a actualizar (ej: {"personal_threshold": 0.70}).
+
+        Returns:
+            True si se actualizó con éxito, False si el estudiante no existe.
+        """
+        if not self.student_exists(codigo):
+            return False
+        metadata = self._load_metadata(codigo)
+        metadata.update(fields)
+        metadata["updated_at"] = datetime.now().isoformat()
+        self._save_metadata(codigo, metadata)
+        return True
+
     # ----------------------------------------------------------------
     # Metadata helpers
     # ----------------------------------------------------------------
@@ -290,4 +309,5 @@ class DatasetManager:
         """Guarda metadata JSON de un estudiante."""
         path = self.dataset_dir / codigo / "metadata.json"
         path.write_text(json.dumps(metadata, indent=2, ensure_ascii=False))
+
 

@@ -56,50 +56,48 @@ except (ImportError, ModuleNotFoundError, RuntimeError, Exception):
     pass
 
 # ============================================================
-# Modelo YOLO-Face
+# Detección facial (SCRFD via InsightFace buffalo_l)
 # ============================================================
-# Modelo pre-entrenado en WIDERFace (se descarga automáticamente)
-# Con GPU: usar yolov8m-face.pt (más preciso, GPU lo maneja sin problema)
-# Sin GPU: usar yolov8n-face.pt (más liviano para CPU)
-YOLO_MODEL_NAME = "yolov8m-face.pt" if CUDA_AVAILABLE else "yolov8n-face.pt"
-YOLO_MODEL_REPO = "https://github.com/akanametov/yolo-face"
-YOLO_CONFIDENCE = 0.5          # Umbral mínimo de confianza
-YOLO_IOU_THRESHOLD = 0.45      # Non-Maximum Suppression IoU
-YOLO_IMG_SIZE = 640             # Tamaño de entrada del modelo
+SCRFD_DET_THRESHOLD = 0.85      # Confianza mínima de detección SCRFD
+SCRFD_NMS_THRESHOLD  = 0.40     # Umbral NMS
 
 # ============================================================
-# Captura y detección
+# Calidad de imagen (quality_gate)
+# ============================================================
+MIN_FACE_AREA    = 112 * 112    # Área mínima del bbox en px² para ArcFace
+MAX_ROLL_DEGREES = 25           # Inclinación máxima tolerada (estimada con kps)
+BRIGHTNESS_MIN   = 40           # Brillo medio mínimo (rango 0-255)
+BRIGHTNESS_MAX   = 220          # Brillo medio máximo (rango 0-255)
+BLUR_THRESHOLD   = 80.0         # Varianza Laplaciano mínima (< = borrosa)
+
+# ============================================================
+# Enrollment — galería multi-frame
+# ============================================================
+MIN_SAMPLES_PER_STUDENT  = 5    # Mínimo de rostros para enrollment completo
+ENROLLMENT_FRAMES        = 8    # Frames objetivo a capturar por alumno
+ENROLLMENT_MIN_SIM       = 0.70 # Similitud mínima para no descartar embedding como outlier
+
+# ============================================================
+# Reconocimiento — ArcFace L2-normalizado
+# ============================================================
+THRESHOLD_SECURE    = 0.72   # Coincidencia directa segura (marcar asistencia inmediata)
+THRESHOLD_GREY_LOW  = 0.65   # Límite inferior de zona gris (validar con galería)
+GALLERY_VOTE_RATIO  = 0.60   # Fracción mínima de votos en galería para aceptar match
+
+# ============================================================
+# Preprocesamiento (legacy — mantener compatibilidad)
 # ============================================================
 MIN_FACE_SIZE = 80              # Píxeles mínimos (ancho o alto) para aceptar un rostro
 MAX_FACES_PER_FRAME = 1         # Para enrollment solo 1 rostro por frame
-FACE_PADDING = 0.25             # 25% padding alrededor del bbox del rostro
-
-# ============================================================
-# Preprocesamiento
-# ============================================================
 FACE_OUTPUT_SIZE = (224, 224)   # Tamaño final del rostro recortado (W, H)
 APPLY_CLAHE = True              # Ecualización adaptativa de histograma
 CLAHE_CLIP_LIMIT = 2.0
 CLAHE_GRID_SIZE = (8, 8)
 
 # ============================================================
-# Calidad de imagen
-# ============================================================
-BLUR_THRESHOLD = 80.0           # Varianza del Laplaciano mínima (< = borrosa)
-BRIGHTNESS_MIN = 40             # Brillo medio mínimo aceptable
-BRIGHTNESS_MAX = 220            # Brillo medio máximo aceptable
-
-# ============================================================
-# Enrollment
-# ============================================================
-MIN_SAMPLES_PER_STUDENT = 5     # Mínimo de rostros para considerar enrollment completo
-MAX_SAMPLES_PER_STUDENT = 20    # Máximo de capturas por estudiante
-WEBCAM_CAPTURE_DELAY_MS = 500   # Delay entre capturas automáticas (ms)
-
-# ============================================================
 # Data Augmentation
 # ============================================================
-ENABLE_AUGMENTATION = True
+ENABLE_AUGMENTATION    = True
 AUGMENTATIONS_PER_IMAGE = 3     # Variantes generadas por cada imagen original
 
 

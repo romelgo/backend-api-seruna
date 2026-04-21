@@ -35,7 +35,6 @@ from backend.routers import enrollment, identification, students
 CUDA_VISIBLE_DEVICES = os.getenv("CUDA_VISIBLE_DEVICES", "0")
 DATASET_DIR = Path(os.getenv("DATASET_DIR", str(PROJECT_ROOT / "dataset")))
 DB_PATH = os.getenv("DB_URL", str(PROJECT_ROOT / "backend" / "attendance.db"))
-SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.5"))
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 
 
@@ -70,12 +69,12 @@ async def lifespan(app: FastAPI):
     app.state.db = AttendanceDB(DB_PATH)
     await app.state.db.init()
 
-    # Threshold de similitud
-    app.state.similarity_threshold = SIMILARITY_THRESHOLD
-
-    print(f"[main] Dataset: {DATASET_DIR}")
-    print(f"[main] DB: {DB_PATH}")
-    print(f"[main] Similarity threshold: {SIMILARITY_THRESHOLD}")
+    import config as _cfg
+    print(f"[main] Dataset:             {DATASET_DIR}")
+    print(f"[main] DB:                  {DB_PATH}")
+    print(f"[main] Umbral seguro:       {_cfg.THRESHOLD_SECURE}")
+    print(f"[main] Umbral zona gris:    {_cfg.THRESHOLD_GREY_LOW}")
+    print(f"[main] Votos galería:       {_cfg.GALLERY_VOTE_RATIO}")
     print("[main] Servidor listo.\n")
 
     yield  # Servidor corriendo
