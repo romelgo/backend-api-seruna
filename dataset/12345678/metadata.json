@@ -1,0 +1,18 @@
+{
+  "codigo": "12345678",
+  "nombre": "brayner masa",
+  "created_at": "2026-04-21T12:13:04.235986",
+  "updated_at": "2026-04-21T12:13:04.774998",
+  "total_raw": 0,
+  "total_faces": 5,
+  "total_augmented": 0,
+  "enrollment_complete": true,
+  "quality_scores": [
+    1518.86,
+    2037.19,
+    1123.46,
+    2052.8,
+    1888.82
+  ],
+  "personal_threshold": 0.72
+}
