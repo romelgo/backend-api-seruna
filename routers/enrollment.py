@@ -117,6 +117,9 @@ async def enroll_student(
 
         # Acumular embedding
         emb = face.embedding.astype(np.float32)
+        norm = np.linalg.norm(emb)
+        if norm > 0:
+            emb = emb / norm
         embeddings_collected.append(emb)
 
     if not embeddings_collected:

@@ -149,6 +149,9 @@ async def identify_frame(
             continue
 
         query_emb = face.embedding.astype(np.float32)
+        norm = np.linalg.norm(query_emb)
+        if norm > 0:
+            query_emb = query_emb / norm
 
         # ── Comparación híbrida (NUEVO) centroide → galería ──────────
         best_code, similarity = emb_manager.find_best_match(

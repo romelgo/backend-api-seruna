@@ -51,5 +51,29 @@ pip install -r requirements.txt
 
 # Para correr en modo dev con auto-recarga:
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# producion
+uvicorn main:app --host 0.0.0.0 --port 8000
+
+# en la vps
+ssh usuario@IP_ADDRESS
+cd /home/student2/labs/face/academia/backend
+source venv/bin/activate
+
+nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
+
+# verificar el log
+tail -f server.log
 ```
+#cloud
+## instalar
+./cloudflared tunnel --url http://localhost:8000
+
+# Activar el TUNEL
+nohup ./cloudflared tunnel --url http://localhost:8000 &
+
+
+#desactivar
+pkill cloudflared
+
+
 La interfaz de tipo Swagger estará automáticamente disponible en `http://localhost:8000/docs` una vez levantada.
