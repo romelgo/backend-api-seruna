@@ -2,14 +2,18 @@
   "codigo": "202118101",
   "nombre": "romel Gutierrez",
   "created_at": "2026-04-20T19:33:36.157076",
-  "updated_at": "2026-04-20T19:33:36.534399",
+  "updated_at": "2026-04-24T07:59:44.113034",
   "total_raw": 0,
-  "total_faces": 2,
+  "total_faces": 6,
   "total_augmented": 0,
-  "enrollment_complete": false,
+  "enrollment_complete": true,
   "quality_scores": [
     658.68,
-    502.01
+    502.01,
+    812.65,
+    816.2,
+    699.53,
+    653.64
   ],
   "personal_threshold": 0.72
 }
