@@ -77,6 +77,23 @@ MIN_SAMPLES_PER_STUDENT  = 5    # Mínimo de rostros para enrollment completo
 ENROLLMENT_FRAMES        = 8    # Frames objetivo a capturar por alumno
 ENROLLMENT_MIN_SIM       = 0.70 # Similitud mínima para no descartar embedding como outlier
 
+# Poses objetivo para enrollment guiado multiaxial
+ENROLLMENT_POSES = [
+    {"label": "Mira al frente",                "yaw":  0,  "pitch":  0, "key": "frontal", "count": 3},
+    {"label": "Gira levemente a la derecha",   "yaw": 15,  "pitch":  0, "key": "right",   "count": 2},
+    {"label": "Gira levemente a la izquierda", "yaw":-15,  "pitch":  0, "key": "left",    "count": 2},
+    {"label": "Levanta un poco la cabeza",     "yaw":  0,  "pitch": 10, "key": "up",      "count": 1},
+]
+
+# Tolerancia angular para aceptar una muestra como "en pose"
+POSE_YAW_TOLERANCE   = 8   # grados
+POSE_PITCH_TOLERANCE = 8   # grados
+
+# Multi-centroide — rangos de clasificación por cluster
+POSE_FRONTAL_MAX_YAW    = 10  # |yaw| < 10  → cluster frontal
+POSE_SIDE_MIN_YAW       = 10  # |yaw| >= 10 → cluster right/left
+POSE_VERTICAL_MIN_PITCH =  8  # |pitch| >= 8 → cluster up/down
+
 # ============================================================
 # Reconocimiento — ArcFace L2-normalizado
 # ============================================================
@@ -97,8 +114,11 @@ CLAHE_GRID_SIZE = (8, 8)
 # ============================================================
 # Data Augmentation
 # ============================================================
-ENABLE_AUGMENTATION    = True
-AUGMENTATIONS_PER_IMAGE = 3     # Variantes generadas por cada imagen original
+ENABLE_AUGMENTATION      = True
+AUGMENTATIONS_PER_IMAGE  = 5     # Variantes generadas por cada imagen original
+AUGMENT_FLIP_HORIZONTAL  = True  # Simula ángulo opuesto leve
+AUGMENT_YAW_RANGE        = 15    # Rotación 2D simulada ±15°
+AUGMENT_BRIGHTNESS_RANGE = 0.20  # Variación de brillo ±20%
 
 
 

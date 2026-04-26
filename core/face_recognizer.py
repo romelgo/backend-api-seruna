@@ -124,7 +124,71 @@ class FaceRecognizer:
         aligned = face_align.norm_crop(bgr_frame, landmark=face.kps, image_size=image_size)
         return aligned
 
-    def quality_gate(self, face, bgr_frame: np.ndarray) -> Tuple[bool, str]:
+    def get_pose(self, face) -> dict:
+        """
+        Retorna la estimación de pose del rostro como (yaw, pitch, roll) en grados.
+
+        Prioridad:
+          1. face.pose de InsightFace (si el modelo de atributos está cargado).
+          2. Estimación geométrica desde los 5 keypoints SCRFD:
+               kps[0]=ojo_izq, kps[1]=ojo_der, kps[2]=nariz, kps[3]=boca_izq, kps[4]=boca_der
+
+        Returns:
+            dict con claves "yaw", "pitch", "roll" en grados (float).
+        """
+        # ── Opción 1: InsightFace expone face.pose directamente ──────
+        if hasattr(face, "pose") and face.pose is not None:
+            arr = np.asarray(face.pose).flatten()
+            if len(arr) >= 3:
+                return {
+                    "yaw":   round(float(arr[0]), 1),
+                    "pitch": round(float(arr[1]), 1),
+                    "roll":  round(float(arr[2]), 1),
+                }
+
+        # ── Opción 2: estimación geométrica con 5 keypoints ──────────
+        yaw, pitch, roll = 0.0, 0.0, 0.0
+
+        if face.kps is not None and len(face.kps) >= 5:
+            kps = face.kps  # (5, 2): eye_l, eye_r, nose, mouth_l, mouth_r
+
+            eye_l, eye_r = kps[0], kps[1]
+            nose         = kps[2]
+            mouth_l, mouth_r = kps[3], kps[4]
+
+            # Roll — ángulo del eje ojo-ojo respecto a la horizontal
+            dx = float(eye_r[0] - eye_l[0])
+            dy = float(eye_r[1] - eye_l[1])
+            roll = float(np.degrees(np.arctan2(dy, dx)))
+
+            # Yaw — asimetría horizontal de los ojos respecto a la nariz
+            # Si la nariz está más a la derecha del centro entre ojos → giro derecha
+            eye_center_x = (eye_l[0] + eye_r[0]) / 2.0
+            eye_span     = max(abs(dx), 1.0)
+            yaw_ratio    = (float(nose[0]) - eye_center_x) / eye_span
+            yaw = float(np.clip(yaw_ratio * 45.0, -45.0, 45.0))
+
+            # Pitch — posición vertical de la nariz respecto a ojos y boca
+            eye_center_y  = (eye_l[1] + eye_r[1]) / 2.0
+            mouth_center_y = (mouth_l[1] + mouth_r[1]) / 2.0
+            face_height   = max(abs(mouth_center_y - eye_center_y), 1.0)
+            # Nariz debería estar ~40% del camino ojo→boca si es frontal
+            nose_ratio = (float(nose[1]) - eye_center_y) / face_height
+            pitch = float(np.clip((nose_ratio - 0.5) * 60.0, -30.0, 30.0))
+
+        elif face.kps is not None and len(face.kps) >= 2:
+            # Fallback mínimo: solo roll desde 2 keypoints de ojos
+            dx = float(face.kps[1][0] - face.kps[0][0])
+            dy = float(face.kps[1][1] - face.kps[0][1])
+            roll = float(np.degrees(np.arctan2(dy, dx)))
+
+        return {
+            "yaw":   round(yaw,   1),
+            "pitch": round(pitch, 1),
+            "roll":  round(roll,  1),
+        }
+
+    def quality_gate(self, face, bgr_frame: np.ndarray, check_blur: bool = False) -> Tuple[bool, str]:
         """
         Filtra rostros de baja calidad antes de llamar a ArcFace.
 
@@ -133,10 +197,12 @@ class FaceRecognizer:
           2. area bbox  >= MIN_FACE_AREA           (rostro suficientemente grande)
           3. |roll|     <= MAX_ROLL_DEGREES        (pose: estimado con eye keypoints)
           4. brillo medio del ROI en [BRIGHTNESS_MIN, BRIGHTNESS_MAX]
+          5. varianza Laplaciana >= BLUR_THRESHOLD (solo si check_blur=True, para enrollment)
 
         Args:
-            face:      Objeto Face de insightface.
-            bgr_frame: Frame BGR original (para extraer ROI de iluminación).
+            face:       Objeto Face de insightface.
+            bgr_frame:  Frame BGR original (para extraer ROI de iluminación/blur).
+            check_blur: Si True, aplica el filtro de nitidez Laplaciana (activar en enrollment).
 
         Returns:
             (True, "ok") si supera todos los filtros.
@@ -176,7 +242,22 @@ class FaceRecognizer:
                     f"[{config.BRIGHTNESS_MIN}, {config.BRIGHTNESS_MAX}])"
                 )
 
+        # 5. Nitidez (varianza Laplaciana) — solo en enrollment
+        if check_blur:
+            try:
+                aligned = self.get_aligned_crop(bgr_frame, face, image_size=112)
+                gray_aligned = cv2.cvtColor(aligned, cv2.COLOR_BGR2GRAY)
+                lap_var = float(cv2.Laplacian(gray_aligned, cv2.CV_64F).var())
+                if lap_var < config.BLUR_THRESHOLD:
+                    return False, f"imagen_borrosa (laplacian={lap_var:.1f} < {config.BLUR_THRESHOLD})"
+            except Exception:
+                pass  # si el crop falla, no bloquear
+
         return True, "ok"
+
+    def quality_gate_enrollment(self, face, bgr_frame: np.ndarray) -> Tuple[bool, str]:
+        """Atajo: quality_gate con check_blur=True para usar en enrollment."""
+        return self.quality_gate(face, bgr_frame, check_blur=True)
 
     @staticmethod
     def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:

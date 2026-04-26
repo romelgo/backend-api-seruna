@@ -153,21 +153,26 @@ async def identify_frame(
         if norm > 0:
             query_emb = query_emb / norm
 
-        # ── Comparación híbrida (NUEVO) centroide → galería ──────────
+        # ── Estimación de pose actual ────────────────────────────────
+        pose_info = recognizer.get_pose(face)
+
+        # ── Comparación híbrida multi-centroide (v3.0) ─────────────
         best_code, similarity = emb_manager.find_best_match(
             query_emb,
+            query_pose=pose_info,
             embeddings=embeddings_index,
         )
 
         face_result = {
-            "bbox": bbox,
-            "match": False,
-            "face_detected": True,
+            "bbox":             bbox,
+            "match":            False,
+            "face_detected":    True,
             "quality_rejected": False,
-            "similarity": round(similarity, 4) if best_code else 0.0,
-            "student_code": None,
-            "name": "Desconocido",
-            "already_marked": False,
+            "similarity":       round(similarity, 4) if best_code else 0.0,
+            "student_code":     None,
+            "name":             "Desconocido",
+            "already_marked":   False,
+            "pose":             pose_info,
         }
 
         if best_code is not None:
